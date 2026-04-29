@@ -15,8 +15,9 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const origin = [process.env.CLIENT_URL, "https://gne-ourstory.netlify.app"];
 
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use(cors({ origin: origin, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
