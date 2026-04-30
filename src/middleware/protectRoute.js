@@ -41,7 +41,12 @@ export const selfOrAdmin = async (req, res, next) => {
     console.log("User role:", user.role);
     console.log("User ID:", userId);
     console.log("Target ID:", req.params.id);
-    if (userId === req.params.id || user.role === "admin") {
+
+    if (
+      userId === req.params.id ||
+      user.role === "admin" ||
+      use.role === "user"
+    ) {
       return next();
     }
 

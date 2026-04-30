@@ -5,14 +5,16 @@ import {
   getMessages,
   createMessage,
   updateMessage,
-  deletePost,
+  deleteMessage,
   getMessageById,
+  getMessagesByMonth,
 } from "../controllers/message.controller.js";
 
 const messageRoutes = express.Router();
 
 messageRoutes.get("/", protectRoute, getMessages);
 messageRoutes.get("/:id", protectRoute, getMessageById);
+messageRoutes.get("/:year/:month", protectRoute, getMessagesByMonth);
 
 messageRoutes.post(
   "/",
@@ -21,6 +23,7 @@ messageRoutes.post(
   upload.fields([
     { name: "images", maxCount: 5 },
     { name: "videos", maxCount: 5 },
+    { name: "audio", maxCount: 1 },
   ]),
   createMessage,
 );
@@ -32,10 +35,11 @@ messageRoutes.put(
   upload.fields([
     { name: "images", maxCount: 5 },
     { name: "videos", maxCount: 5 },
+    { name: "audio", maxCount: 1 },
   ]),
   updateMessage,
 );
 
-messageRoutes.delete("/:id", protectRoute, selfOrAdmin, deletePost);
+messageRoutes.delete("/:id", protectRoute, selfOrAdmin, deleteMessage);
 
 export default messageRoutes;

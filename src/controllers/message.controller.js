@@ -7,7 +7,7 @@ export const getMessages = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      messages,
+      data: messages,
     });
   } catch (error) {
     return res.status(500).json({
@@ -32,39 +32,65 @@ export const createMessage = async (req, res) => {
   try {
     const images = [];
     const videos = [];
+    let audio = null;
 
-    // --- Upload Images ---
+    // --- IMAGES ---
     if (req.files?.images) {
-      for (const file of req.files.images) {
-        const result = await imagekit.upload({
-          file: file.buffer,
-          fileName: file.originalname,
-          folder: `messages/${userId}/images`,
-        });
+      const uploadedImages = await Promise.all(
+        req.files.images.map((file) =>
+          imagekit.upload({
+            file: file.buffer,
+            fileName: file.originalname,
+            folder: `messages/${userId}/images`,
+          }),
+        ),
+      );
 
+      uploadedImages.forEach((img) => {
         images.push({
-          url: result.url,
-          fileId: result.fileId,
+          url: img.url,
+          fileId: img.fileId,
         });
-      }
+      });
     }
 
-    // --- Upload Videos ---
+    // --- VIDEOS ---
     if (req.files?.videos) {
-      for (const file of req.files.videos) {
-        const result = await imagekit.upload({
-          file: file.buffer,
-          fileName: file.originalname,
-          folder: `messages/${userId}/videos`,
-        });
+      const uploadedVideos = await Promise.all(
+        req.files.videos.map((file) =>
+          imagekit.upload({
+            file: file.buffer,
+            fileName: file.originalname,
+            folder: `messages/${userId}/videos`,
+          }),
+        ),
+      );
 
+      uploadedVideos.forEach((vid) => {
         videos.push({
-          url: result.url,
-          fileId: result.fileId,
+          url: vid.url,
+          fileId: vid.fileId,
         });
-      }
+      });
     }
 
+    // --- AUDIO (single file) ---
+    if (req.files?.audio?.[0]) {
+      const file = req.files.audio[0];
+
+      const result = await imagekit.upload({
+        file: file.buffer,
+        fileName: file.originalname,
+        folder: `messages/${userId}/audio`,
+      });
+
+      audio = {
+        url: result.url,
+        fileId: result.fileId,
+      };
+    }
+
+    // --- SAVE MESSAGE ---
     const newMessage = new Message({
       user: userId,
       month,
@@ -73,6 +99,7 @@ export const createMessage = async (req, res) => {
       year,
       images,
       videos,
+      audio,
     });
 
     await newMessage.save();
@@ -84,6 +111,7 @@ export const createMessage = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     return res.status(500).json({
       success: false,
       message: "Create message failed",
@@ -118,6 +146,30 @@ export const getMessageById = async (req, res) => {
   }
 };
 
+export const getMessagesByMonth = async (req, res) => {
+  const { year, month } = req.params;
+
+  try {
+    const messages = await Message.find({
+      year,
+      month,
+    })
+      .populate("user", "name email")
+      .sort({ createdAt: -1 }); // latest first (important)
+
+    return res.status(200).json({
+      success: true,
+      data: messages,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch messages by month",
+      error: error.message,
+    });
+  }
+};
+
 export const updateMessage = async (req, res) => {
   const userId = req.userId;
   const messageId = req.params.id;
@@ -143,46 +195,27 @@ export const updateMessage = async (req, res) => {
     }
 
     // =========================
-    // 🔵 HANDLE IMAGES
+    // IMAGES
     // =========================
 
-    let parsedImages = [];
-    const hasExistingImages = typeof existingImages !== "undefined";
+    let updatedImages = message.images;
 
-    if (hasExistingImages) {
-      try {
-        parsedImages = JSON.parse(existingImages); // [{url, fileId}]
-      } catch {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid existingImages format",
-        });
-      }
-    }
+    if (existingImages !== undefined) {
+      let parsedImages = JSON.parse(existingImages);
 
-    let updatedImages = [];
-
-    if (hasExistingImages) {
-      // keep existing
-      updatedImages = [...parsedImages];
-
-      // find removed
       const removedImages = message.images.filter(
         (img) => !parsedImages.some((e) => e.fileId === img.fileId),
       );
 
-      // delete removed in parallel
       await Promise.all(
         removedImages.map((img) =>
           imagekit.deleteFile(img.fileId).catch(() => null),
         ),
       );
-    } else {
-      // ⚠️ do NOT auto delete everything
-      updatedImages = [...message.images];
+
+      updatedImages = parsedImages;
     }
 
-    // upload new images
     if (req.files?.images) {
       const uploadedImages = await Promise.all(
         req.files.images.map((file) =>
@@ -203,27 +236,13 @@ export const updateMessage = async (req, res) => {
     }
 
     // =========================
-    // 🔵 HANDLE VIDEOS
+    // VIDEOS
     // =========================
 
-    let parsedVideos = [];
-    const hasExistingVideos = typeof existingVideos !== "undefined";
+    let updatedVideos = message.videos;
 
-    if (hasExistingVideos) {
-      try {
-        parsedVideos = JSON.parse(existingVideos);
-      } catch {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid existingVideos format",
-        });
-      }
-    }
-
-    let updatedVideos = [];
-
-    if (hasExistingVideos) {
-      updatedVideos = [...parsedVideos];
+    if (existingVideos !== undefined) {
+      let parsedVideos = JSON.parse(existingVideos);
 
       const removedVideos = message.videos.filter(
         (vid) => !parsedVideos.some((e) => e.fileId === vid.fileId),
@@ -234,8 +253,8 @@ export const updateMessage = async (req, res) => {
           imagekit.deleteFile(vid.fileId).catch(() => null),
         ),
       );
-    } else {
-      updatedVideos = [...message.videos];
+
+      updatedVideos = parsedVideos;
     }
 
     if (req.files?.videos) {
@@ -258,7 +277,31 @@ export const updateMessage = async (req, res) => {
     }
 
     // =========================
-    // ✏️ UPDATE TEXT FIELDS
+    // 🔵 AUDIO (MISSING FIX)
+    // =========================
+
+    if (req.files?.audio?.[0]) {
+      // delete old audio if exists
+      if (message.audio?.fileId) {
+        await imagekit.deleteFile(message.audio.fileId).catch(() => null);
+      }
+
+      const file = req.files.audio[0];
+
+      const result = await imagekit.upload({
+        file: file.buffer,
+        fileName: file.originalname,
+        folder: `messages/${userId}/audio`,
+      });
+
+      message.audio = {
+        url: result.url,
+        fileId: result.fileId,
+      };
+    }
+
+    // =========================
+    // TEXT FIELDS
     // =========================
 
     if (title !== undefined) message.title = title;
@@ -275,8 +318,6 @@ export const updateMessage = async (req, res) => {
       data: message,
     });
   } catch (error) {
-    console.error("Update error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Update failed",
@@ -285,13 +326,14 @@ export const updateMessage = async (req, res) => {
   }
 };
 
-export const deletePost = async (req, res) => {
+export const deleteMessage = async (req, res) => {
   const userId = req.userId;
   const messageId = req.params.id;
 
   try {
-    // 1. Find message first
-    const message = await Message.findOne({ _id: messageId, user: userId });
+    const message = await Message.findOne({
+      _id: messageId,
+    });
 
     if (!message) {
       return res.status(404).json({
@@ -300,30 +342,28 @@ export const deletePost = async (req, res) => {
       });
     }
 
-    // 2. Collect all fileIds
-    const imageFileIds = (message.images || []).map((img) => img.fileId);
-    const videoFileIds = (message.videos || []).map((vid) => vid.fileId);
+    // Collect all fileIds
+    const fileIds = [
+      ...(message.images || []).map((i) => i.fileId),
+      ...(message.videos || []).map((v) => v.fileId),
+      ...(message.audio?.fileId ? [message.audio.fileId] : []),
+    ];
 
-    const allFileIds = [...imageFileIds, ...videoFileIds];
-
-    // 3. Delete all files in parallel
-    if (allFileIds.length > 0) {
+    // Delete from ImageKit
+    if (fileIds.length > 0) {
       await Promise.all(
-        allFileIds.map(
-          (fileId) => imagekit.deleteFile(fileId).catch(() => null), // don't crash if one fails
-        ),
+        fileIds.map((id) => imagekit.deleteFile(id).catch(() => null)),
       );
     }
 
-    // 4. Delete message from DB
-    await Message.deleteOne({ _id: messageId });
+    // Delete message from DB
+    await message.deleteOne();
 
     return res.status(200).json({
       success: true,
-      message: "Message and media deleted successfully",
+      message: "Message deleted successfully",
     });
   } catch (error) {
-    console.error(error);
     return res.status(500).json({
       success: false,
       message: "Delete failed",

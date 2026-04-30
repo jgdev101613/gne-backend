@@ -10,8 +10,10 @@ import {
   sendWelcomeEmail,
   sendPasswordResetEmail,
   sendResetSuccessEmail,
+  sendIdentityVerification,
 } from "../mailtrap/emails.js";
 import imagekit from "../lib/imagekit.config.js";
+import { VERIFY_IDENTITY } from "../mailtrap/emailTemplate.js";
 
 export const signup = async (req, res) => {
   const { email, password, name } = req.body;
@@ -222,6 +224,40 @@ export const verifyEmail = async (req, res) => {
     res.status(500).json({
       message: "Internal Server Error",
       success: false,
+      error: error.message,
+    });
+  }
+};
+
+export const verifyIdentity = async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "No user found",
+      });
+    }
+
+    user.role = "user";
+
+    const result = await user.save();
+
+    await sendIdentityVerification(user.name, user.email);
+
+    return res.status(200).json({
+      success: true,
+      message: `${user.name} identity has been verified.`,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
       error: error.message,
     });
   }

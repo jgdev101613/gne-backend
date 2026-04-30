@@ -23,6 +23,10 @@ const postSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    audio: {
+      url: String,
+      fileId: String,
+    },
     images: [
       {
         url: String,

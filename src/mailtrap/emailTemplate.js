@@ -1,12 +1,11 @@
-import dotenv from "dotenv";
-dotenv.config();
+import { ENV } from "../utils/env.config.js";
 
 /* ─────────────────────────────
    BRAND + COLOR SYSTEM
 ───────────────────────────── */
 
-const PRIMARY = process.env.EMAIL_PRIMARY_COLOR || "#a855f7";
-const ACCENT = "#ec4899";
+const PRIMARY = ENV.EMAIL_PRIMARY_COLOR || "#a855f7";
+const ACCENT = ENV.EMAIL_SECONDARY_COLOR || "#d81b60";
 
 /* softer, more readable email background */
 const BG = "#f6f7fb";
@@ -15,8 +14,9 @@ const TEXT = "#111827";
 const MUTED = "#6b7280";
 
 /* optional header image */
+const CLIENT_ONLINE = ENV.CLIENT_ONLINE_URL;
 const HEADER_BG =
-  process.env.EMAIL_HEADER_BG || "https://ik.imagekit.io/gne/email-image";
+  ENV.EMAIL_HEADER_BG || "https://ik.imagekit.io/gne/email-image";
 
 /* ─────────────────────────────
    BASE TEMPLATE (LIGHT + PREMIUM EMAIL STYLE)
@@ -344,6 +344,44 @@ export const WELCOME_EMAIL_TEMPLATE = (email, name = "User") =>
         font-weight:600;
       ">
         Verify Identity
+      </a>
+    </div>
+  `);
+
+export const VERIFY_IDENTITY = (name) =>
+  BASE_TEMPLATE(`
+    <h2 style="color:${TEXT};margin:0 0 8px;">
+      Welcome, Babe (${name})
+    </h2>
+
+    <p style="color:${MUTED};font-size:14px;line-height:1.6;">
+      Your identity has been verified by JGDEV
+    </p>
+
+    <div style="
+      margin-top:18px;
+      padding:14px;
+      border-radius:12px;
+      background:#f9fafb;
+      border:1px solid #e5e7eb;
+      color:${TEXT};
+      font-size:13px;
+      line-height:1.6;
+    ">
+      You can now participate on monthly messages and many more!
+    </div>
+
+    <div style="text-align:center;margin-top:24px;">
+      <a href="${CLIENT_ONLINE}" style="
+        display:inline-block;
+        padding:12px 26px;
+        border-radius:10px;
+        background:linear-gradient(135deg, ${PRIMARY}, ${ACCENT});
+        color:#fff;
+        text-decoration:none;
+        font-weight:600;
+      ">
+        Visit Site
       </a>
     </div>
   `);
