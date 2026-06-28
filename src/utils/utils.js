@@ -1,14 +1,15 @@
 import jwt from "jsonwebtoken";
+import { ENV } from "./env.config.js";
 import { User } from "../models/User.js";
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = ENV.NODE_ENV === "production";
 
 export const generateVerificationCode = async () => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   try {
     const checkCode = await User.findOne({ verificationToken: code });
     if (checkCode) {
-      return generateVerificationCode(); // Generate a new code if the current one is already in use
+      return generateVerificationCode();
     }
     return code;
   } catch (error) {
@@ -17,8 +18,8 @@ export const generateVerificationCode = async () => {
 };
 
 export const generateTokenAndSetCookie = (res, userId) => {
-  const token = jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
+  const token = jwt.sign({ userId }, ENV.JWT_SECRET, {
+    expiresIn: ENV.JWT_EXPIRES_IN,
   });
 
   res.cookie("token", token, {
